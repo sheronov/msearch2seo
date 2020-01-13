@@ -1,0 +1,36 @@
+# IntelliJ project files
+.idea/
+*.iml
+./idea/workspace.xml
+out
+gen
+
+# ignore MODX files
+/assets/addbrand.gif
+/assets/pricing.gif
+/assets/components
+/connectors/*
+/core/components
+/core/config
+/core/docs
+/core/error
+/core/lexicon
+/core/model
+/core/xpdo
+/core/ht.access
+/manager/*
+/setup/*
+/config.core.php
+/index.php
+/.htaccess
+/frontendmanager.gif
+/goods.yml
+/ht.access
+
+# ignore node modules
+/node_modules/
+
+/core/components/msearch2/phpmorphy
+# do not ignore
+!/assets/components/msearch2
+!/core/components/msearch2
