@@ -50,7 +50,7 @@ class mSearch2SeoHomeManagerController extends modExtraManagerController
     public function loadCustomCssJs()
     {
         $this->addJavascript($this->mSearch2->config['jsUrl'] . 'mgr/widgets/index.form.js');
-        $this->addJavascript($this->mSearch2->config['jsUrl'] . 'mgr/widgets/search.grid.js');
+        $this->addJavascript($this->mSearch2->config['jsUrl'] . 'mgr/widgets/seosearch.grid.js');
         $this->addJavascript($this->mSearch2->config['jsUrl'] . 'mgr/widgets/aliases.grid.js');
         $this->addJavascript($this->mSearch2->config['jsUrl'] . 'mgr/widgets/queries.grid.js');
         $this->addJavascript($this->mSearch2->config['jsUrl'] . 'mgr/widgets/dictionaries.grid.js');

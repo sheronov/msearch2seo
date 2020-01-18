@@ -6,5 +6,9 @@
   `$mSearch2 = $modx->getService('msearch2', 'mSearch2',`  
   на `$mSearch2 = $modx->getService('msearch2seo', 'mSearch2Seo',`
 4. Создать системную настройку `msearch2.action_url` со значением `/assets/components/msearch2/action-search.php`
-5. Для работы в админке добавить файл `seohome.class.php` сюда `/core/components/msearch2/controllers/`  
-  и отредактировать пункт меню mSearch2 в админке `/manager/?a=system/action`, изменив действие `home` на `seohome`.
+5. Для работы и проверки поиска в админке:
+    1. добавить файл `seohome.class.php` сюда `/core/components/msearch2/controllers/`    
+    2. Добавить файл `seosearch.grid.js` в папку `/assets/components/msearch2/js/mgr/widgets/`
+    3. Добавить файл `seogetlist.class.php` в папку `/core/components/msearch2/processors/mgr/search/`
+    4. Отредактировать пункт меню mSearch2 в админке `/manager/?a=system/action`, изменив действие `home` на `seohome`
+6. 
