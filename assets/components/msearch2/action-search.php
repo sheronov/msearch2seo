@@ -1,6 +1,7 @@
 <?php
+
 if (empty($_REQUEST['action'])) {
-    exit(json_encode(array('success' => false, 'message' => 'Access denied')));
+    exit(json_encode(['success' => false, 'message' => 'Access denied']));
 } else {
     $action = $_REQUEST['action'];
 }
@@ -8,7 +9,7 @@ if (empty($_REQUEST['action'])) {
 /** @var modX $modx */
 define('MODX_API_MODE', true);
 /** @noinspection PhpIncludeInspection */
-require_once dirname(dirname(dirname(dirname(__FILE__)))) . '/index.php';
+require_once dirname(dirname(dirname(dirname(__FILE__)))).'/index.php';
 $modx->getService('error', 'error.modError');
 $modx->getRequest();
 $modx->setLogLevel(modX::LOG_LEVEL_ERROR);
@@ -28,7 +29,7 @@ if (!empty($_REQUEST['pageId']) && !empty($_REQUEST['key'])) {
 // Load config
 if (empty($config) || !is_array($config)) {
     $action = 'no_config';
-    $config = $scriptProperties = array();
+    $config = $scriptProperties = [];
 } else {
     $scriptProperties = isset($config['scriptProperties'])
         ? $config['scriptProperties']
@@ -42,7 +43,7 @@ $pdoFetch->addTime('pdoTools loaded.');
 
 /** @var mSearch2 $mSearch2 */
 $mSearch2 = $modx->getService('msearch2seo', 'mSearch2Seo',
-    MODX_CORE_PATH . 'components/msearch2/model/msearch2/', $scriptProperties
+    MODX_CORE_PATH.'components/msearch2/model/msearch2/', $scriptProperties
 );
 
 // Base url for pdoPage
@@ -102,12 +103,15 @@ switch ($action) {
         if (!empty($paginatorProperties['queryVar']) && !empty($_REQUEST[$paginatorProperties['queryVar']])) {
             $query = $_REQUEST[$paginatorProperties['queryVar']];
             if ($found = $mSearch2->Search($query)) {
+                $foundIds = array_map(function ($foundId) {
+                    return explode('::', $foundId)[0];
+                }, array_keys($found));
                 $ids = array_intersect($ids, array_keys($found));
             }
         }
 
         $resources = implode(',', $ids);
-        $pdoFetch->addTime('Getting filters for saved ids: (' . $resources . ')');
+        $pdoFetch->addTime('Getting filters for saved ids: ('.$resources.')');
 
         $matched = $mSearch2->Filter($ids, $_REQUEST);
         $ids = array_intersect($ids, $matched);
@@ -117,13 +121,13 @@ switch ($action) {
             $suggestions = $mSearch2->getSuggestions($resources, $_REQUEST, $ids);
             $pdoFetch->addTime('Suggestions retrieved.');
         } else {
-            $suggestions = array();
+            $suggestions = [];
             $pdoFetch->addTime('Suggestions disabled by snippet parameter.');
         }
 
         // Save log
         $log = $pdoFetch->timings;
-        $pdoFetch->timings = array();
+        $pdoFetch->timings = [];
 
         // Get results
         if (!empty($ids)) {
@@ -132,7 +136,7 @@ switch ($action) {
             $paginatorProperties['resources'] = is_array($ids) ? implode(',', $ids) : $ids;
             // Try to save weight of founded ids if using mSearch2
             if (!empty($found) && strtolower($paginatorProperties['element']) == 'msearch2') {
-                $tmp = array();
+                $tmp = [];
                 foreach ($ids as $v) {
                     $tmp[$v] = @$found[$v];
                 }
@@ -150,12 +154,12 @@ switch ($action) {
                 $pagination = $pdoFetch->fastProcess($pagination);
             } else {
                 $maxIterations = (integer)$modx->getOption('parser_max_iterations', null, 10);
-                $modx->getParser()->processElementTags('', $results, false, false, '[[', ']]', array(), $maxIterations);
-                $modx->getParser()->processElementTags('', $results, true, true, '[[', ']]', array(), $maxIterations);
-                $modx->getParser()->processElementTags('', $pagination, false, false, '[[', ']]', array(),
+                $modx->getParser()->processElementTags('', $results, false, false, '[[', ']]', [], $maxIterations);
+                $modx->getParser()->processElementTags('', $results, true, true, '[[', ']]', [], $maxIterations);
+                $modx->getParser()->processElementTags('', $pagination, false, false, '[[', ']]', [],
                     $maxIterations
                 );
-                $modx->getParser()->processElementTags('', $pagination, true, true, '[[', ']]', array(),
+                $modx->getParser()->processElementTags('', $pagination, true, true, '[[', ']]', [],
                     $maxIterations
                 );
             }
@@ -165,22 +169,22 @@ switch ($action) {
         }
 
         $pdoFetch->timings = $log;
-        $pdoFetch->addTime('Total filter operations: ' . $mSearch2->filter_operations);
-        $response = array(
+        $pdoFetch->addTime('Total filter operations: '.$mSearch2->filter_operations);
+        $response = [
             'success' => true,
             'message' => '',
-            'data' => array(
-                'results' => !empty($results) ? $results : $modx->lexicon('mse2_err_no_results'),
-                'pagination' => $pagination,
-                'total' => empty($total) ? 0 : $total,
-                'page' => $page,
-                'pages' => $pages,
+            'data'    => [
+                'results'     => !empty($results) ? $results : $modx->lexicon('mse2_err_no_results'),
+                'pagination'  => $pagination,
+                'total'       => empty($total) ? 0 : $total,
+                'page'        => $page,
+                'pages'       => $pages,
                 'suggestions' => $suggestions,
-                'log' => ($modx->user->hasSessionContext('mgr') && !empty($scriptProperties['showLog']))
+                'log'         => ($modx->user->hasSessionContext('mgr') && !empty($scriptProperties['showLog']))
                     ? print_r($pdoFetch->getTime(), 1)
                     : '',
-            ),
-        );
+            ],
+        ];
         $response = json_encode($response);
         break;
 
@@ -189,7 +193,7 @@ switch ($action) {
             ? $scriptProperties['element']
             : 'mSearch2';
 
-        $results = array();
+        $results = [];
         $query = trim(@$_REQUEST[$scriptProperties['queryVar']]);
         if (empty($scriptProperties['limit'])) {
             $scriptProperties['limit'] = 5;
@@ -214,7 +218,7 @@ switch ($action) {
 
                     $scriptProperties['sortby'] = 'quantity';
                     $scriptProperties['sortdir'] = 'desc';
-                    $rows = $pdoFetch->getCollection('mseQuery', '["' . $condition . '"]', $scriptProperties);
+                    $rows = $pdoFetch->getCollection('mseQuery', '["'.$condition.'"]', $scriptProperties);
                     $i = 1;
                     foreach ($rows as $row) {
                         $intro = $mSearch2->Highlight($row['query'], $query);
@@ -223,10 +227,10 @@ switch ($action) {
                         }
                         $row['pagetitle'] = $row['title'] = $intro;
                         $row['idx'] = $i;
-                        $results[] = array(
+                        $results[] = [
                             'value' => html_entity_decode($row['query'], ENT_QUOTES, 'UTF-8'),
                             'label' => $pdoFetch->getChunk($scriptProperties['tpl'], $row),
-                        );
+                        ];
                         $i++;
                     }
                     break;
@@ -234,8 +238,13 @@ switch ($action) {
                 default:
                     $found = $mSearch2->Search($query);
                     if (!empty($found)) {
-                        $resources = strtolower($snippet) == 'msearch2'
-                            ? json_encode($found)
+                        $foundResources = [];
+                        foreach ($found as $foundKey => $foundWeight) {
+                            $foundId = explode('::', $foundKey)[0];
+                            $foundResources[$foundId] = $foundWeight;
+                        }
+                        $resources = strtolower($snippet) === 'msearch2'
+                            ? json_encode($foundResources)
                             : implode(',', array_keys($found));
 
                         if (!isset($scriptProperties['parents'])) {
@@ -262,16 +271,14 @@ switch ($action) {
                         $scriptProperties['select'] = 'id,pagetitle';
                         $scriptProperties['returnIds'] = 1;
                         if ($ids = $pdoFetch->runSnippet($snippet, $scriptProperties)) {
-                            $rows = $pdoFetch->getCollection('modResource', null, array('resources' => $ids));
+                            $rows = $pdoFetch->getCollection('modResource', null, ['resources' => $ids]);
                             foreach ($rows as $k => $row) {
-                                $results[] = array(
-                                    'id' => $row['id'],
-                                    'url' => $modx->makeUrl($row['id'], '', '', 'full'),
+                                $results[] = [
+                                    'id'    => $row['id'],
+                                    'url'   => $modx->makeUrl($row['id'], '', '', 'full'),
                                     'value' => html_entity_decode($row['pagetitle'], ENT_QUOTES, 'UTF-8'),
-                                    'label' => isset($processed[$k])
-                                        ? $processed[$k]
-                                        : $pdoFetch->getChunk($scriptProperties['tpl'], $row),
-                                );
+                                    'label' => $processed[$k] ?? $pdoFetch->getChunk($scriptProperties['tpl'], $row),
+                                ];
                             }
                         }
                     }
@@ -288,24 +295,24 @@ switch ($action) {
             $maxIterations = (integer)$modx->getOption('parser_max_iterations', null, 10);
             foreach ($results as &$v) {
                 if (!empty($v['label'])) {
-                    $modx->getParser()->processElementTags('', $v['label'], false, false, '[[', ']]', array(),
+                    $modx->getParser()->processElementTags('', $v['label'], false, false, '[[', ']]', [],
                         $maxIterations
                     );
-                    $modx->getParser()->processElementTags('', $v['label'], true, true, '[[', ']]', array(),
+                    $modx->getParser()->processElementTags('', $v['label'], true, true, '[[', ']]', [],
                         $maxIterations
                     );
                 }
             }
         }
 
-        $response = array(
+        $response = [
             'success' => true,
             'message' => '',
-            'data' => array(
+            'data'    => [
                 'results' => $results,
-                'total' => count($results),
-            ),
-        );
+                'total'   => count($results),
+            ],
+        ];
         if (!empty($log)) {
             $response['data']['log'] = $log;
         }
@@ -313,10 +320,10 @@ switch ($action) {
         break;
 
     case 'no_config':
-        $response = json_encode(array('success' => false, 'message' => 'Could not load config'));
+        $response = json_encode(['success' => false, 'message' => 'Could not load config']);
         break;
     default:
-        $response = json_encode(array('success' => false, 'message' => 'Access denied'));
+        $response = json_encode(['success' => false, 'message' => 'Access denied']);
 }
 
 @session_write_close();
