@@ -225,9 +225,6 @@ class mSearch2Seo extends mSearch2
         $object->set('found', count($result));
         $object->save();
 
-        // $this->modx->log(MODX_LOG_LEVEL_ERROR, "SeoSearch: \n".$this->pdoTools->getTime(true));
-        // $this->modx->log(MODX_LOG_LEVEL_ERROR, "SeoSearch results: \n".print_r($result, 1));
-
         return $result;
     }
 

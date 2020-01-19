@@ -68,7 +68,6 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
         $c = $this->prepareQueryAfterCount($c);
 
 
-        // $c->sortby('find_in_set(`id`,\''.implode(',', $ids).'\')', '');
         if ($limit > 0) {
             $c->limit($limit, $start);
         }
@@ -84,11 +83,11 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
             ]);
             $c->groupby($this->classKey.'.id, sfUrls.id');
             $c->sortby('FIELD(IFNULL(sfUrls.id, modResource.id), '.implode(',', $this->toSortIds).')');
+        } else {
+            $c->sortby('find_in_set(`id`,\''.implode(',', array_keys($this->ids)).'\')', '');
         }
 
-        $c->prepare();
-        $this->modx->log(1, print_r('SeoAdminSearch: '.$c->toSQL(), 1));
-        if ($c->stmt->execute()) {
+        if ($c->prepare() && $c->stmt->execute()) {
             $data['results'] = $c->stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
