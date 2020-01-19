@@ -22,7 +22,7 @@ mSearch2.grid.Search = function (config) {
         paging: true,
         remoteSort: true,
         columns: [this.exp,
-            {header: _('id'), dataIndex: 'id', width: 70},
+            {header: _('id'), dataIndex: 'id', width: 70, renderer: this.renderId},
             {header: _('pagetitle'), dataIndex: 'pagetitle', width: 150, renderer: this.renderPagetitle},
             {header: _('mse2_weight'), dataIndex: 'weight', width: 50},
             {header: _('published'), dataIndex: 'published', width: 50, renderer: this.renderPublished},
@@ -133,11 +133,25 @@ Ext.extend(mSearch2.grid.Search, MODx.grid.Grid, {
         return param ? params[param] : params;
     },
 
+    renderId: function (val, cell, row) {
+        var pageId = val;
+        if (row.json.hasOwnProperty('seo_id') && row.json['seo_id']) {
+            pageId = row.json['seo_id'] + ' (page: ' + val + ')';
+        }
+        return pageId;
+    },
+
     renderPagetitle: function (val, cell, row) {
+        var label = val;
         var action = MODx.action ? MODx.action['resource/update'] : 'resource/update';
         var url = 'index.php?a=' + action + '&id=' + row.data['id'];
 
-        return '<a href="' + url + '" target="_blank" style="color:#0088cc">' + val + '</a>'
+        if (row.json.hasOwnProperty('seo_id') && row.json['seo_id']) {
+            label = 'SeoFilter: ' + row.json['seo_link'] || label;
+            url = '?a=seoedit&namespace=seofilter&id=' + row.json['seo_id'];
+        }
+
+        return '<a href="' + url + '" target="_blank" style="color:#0088cc">' + label + '</a>'
     },
 
     renderPublished: function (val, cell, row) {

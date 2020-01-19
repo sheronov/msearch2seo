@@ -6,7 +6,11 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
     public $classKey   = 'modResource';
     /** @var mSearch2 $mSearch2 */
     public    $mSearch2;
-    protected $ids = [];
+    protected $ids       = [];
+    protected $resources = [];
+    protected $seoIds    = [];
+    protected $seoPages  = [];
+    protected $toSortIds = [];
 
 
     /**
@@ -37,16 +41,34 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
             return ['total' => 0, 'results' => []];
         }
 
+        foreach ($this->ids as $fKey => $foundWeight) {
+            $tmp = explode('::', $fKey);
+            if (isset($tmp[1]) && $tmp[1] === 'sfUrls') {
+                $this->seoIds[] = $tmp[0];
+            } else {
+                $this->resources[] = $tmp[0];
+            }
+            $this->toSortIds[] = $tmp[0];
+        }
+
+        if (!empty($this->seoIds)) {
+            $q = $this->modx->newQuery('sfUrls');
+            $q->where(['id:IN' => array_unique($this->seoIds)]);
+            $q->select('page_id');
+            if ($q->prepare() && $q->stmt->execute()) {
+                $this->seoPages = $q->stmt->fetchAll(PDO::FETCH_COLUMN);
+            }
+            $this->resources = array_unique(array_merge($this->resources, $this->seoPages));
+        }
+
         /* query for chunks */
         $c = $this->modx->newQuery($this->classKey);
         $c = $this->prepareQueryBeforeCount($c);
         $data['total'] = $this->modx->getCount($this->classKey, $c);
         $c = $this->prepareQueryAfterCount($c);
 
-        $ids = array_map(function ($id) {
-            return explode('::', $id)[0];
-        }, array_keys($this->ids));
-        $c->sortby('find_in_set(`id`,\''.implode(',', $ids).'\')', '');
+
+        // $c->sortby('find_in_set(`id`,\''.implode(',', $ids).'\')', '');
         if ($limit > 0) {
             $c->limit($limit, $start);
         }
@@ -55,8 +77,18 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
             $this->modx->getSelectColumns($this->classKey, $this->classKey),
             $this->modx->getSelectColumns('mseIntro', 'mseIntro', '', ['intro']),
         ]);
+        if (!empty($this->seoIds)) {
+            $c->select([
+                '`IntroSeo`.`intro` as `introseo`',
+                $this->modx->getSelectColumns('sfUrls', 'sfUrls', 'seo_')
+            ]);
+            $c->groupby($this->classKey.'.id, sfUrls.id');
+            $c->sortby('FIELD(IFNULL(sfUrls.id, modResource.id), '.implode(',', $this->toSortIds).')');
+        }
 
-        if ($c->prepare() && $c->stmt->execute()) {
+        $c->prepare();
+        $this->modx->log(1, print_r('SeoAdminSearch: '.$c->toSQL(), 1));
+        if ($c->stmt->execute()) {
             $data['results'] = $c->stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
@@ -90,8 +122,15 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
      */
     public function prepareQueryBeforeCount(xPDOQuery $c)
     {
-        $c->where(['id:IN' => array_keys($this->ids)]);
-        $c->leftJoin('mseIntro', 'mseIntro', '`modResource`.`id` = `mseIntro`.`resource`');
+        $c->where(['id:IN' => $this->resources]);
+        if (!empty($this->seoIds)) {
+            $c->leftJoin('sfUrls', 'sfUrls', $this->classKey.'.id = sfUrls.page_id AND modResource.id IN ('.implode(',',
+                    $this->seoPages).') AND sfUrls.id IN ('.implode(',', $this->seoIds).')');
+            $c->leftJoin('mseIntro', 'IntroSeo', "sfUrls.id = IntroSeo.resource  AND IntroSeo.class_key = 'sfUrls'");
+        }
+
+        $c->leftJoin('mseIntro', 'mseIntro',
+            "`modResource`.`id` = `mseIntro`.`resource` AND `mseIntro`.`class_key` != 'sfUrls'");
 
         if (!$this->getProperty('unpublished')) {
             $c->where(['published' => 1]);
@@ -111,9 +150,20 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
      */
     public function prepareArray(array $array)
     {
-        $array['weight'] = $this->ids[$array['id']];
-        $array['intro'] = $this->mSearch2->Highlight($array['intro'], $this->getProperty('query'), '<b>', '</b>');
+        if (isset($array['seo_id'])) {
+            $array['weight'] = $this->ids[$array['seo_id'].'::'.'sfUrls'] ?? '';
+            $seoUrl = $array['seo_new_url'] ?: $array['seo_old_url'];
+            $array['uri'] = $this->mSearch2->makeUrl($seoUrl, $array['uri'], $array['id']);
+        } else {
+            $array['weight'] = $this->ids[$array['id']] ?? '';
+        }
 
+        if ($array['introseo'] ?? false) {
+            $array['intro'] = $this->mSearch2->Highlight($array['introseo'], $this->getProperty('query'), '<b>',
+                '</b>');
+        } else {
+            $array['intro'] = $this->mSearch2->Highlight($array['intro'], $this->getProperty('query'), '<b>', '</b>');
+        }
         return $array;
     }
 
@@ -126,6 +176,9 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
         if ($this->modx->loadClass('msearch2seo', MODX_CORE_PATH.'components/msearch2/model/msearch2/', false, true)) {
             $this->mSearch2 = new mSearch2Seo($this->modx, []);
         }
+
+        $this->modx->addPackage('seofilter', $this->modx->getOption('seofilter_core_path', [],
+                $this->modx->getOption('core_path').'components/seofilter/').'model/');
 
         return $this->mSearch2 instanceof mSearch2Seo;
     }

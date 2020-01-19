@@ -124,14 +124,14 @@ if (!empty($seoIds)) {
         $seoPages = $q->stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
-    $leftJoin['sfUrls'] = [
-        'class' => 'sfUrls',
-        'alias' => 'sfUrls',
-        'on'    => $class.'.id = sfUrls.page_id AND modResource.id IN ('.implode(',',
-                $seoPages).') AND sfUrls.id IN ('.implode(',', $seoIds).')'
-    ];
-
     if (empty($returnIds)) {
+        $leftJoin['sfUrls'] = [
+            'class' => 'sfUrls',
+            'alias' => 'sfUrls',
+            'on'    => $class.'.id = sfUrls.page_id AND modResource.id IN ('.implode(',',
+                    $seoPages).') AND sfUrls.id IN ('.implode(',', $seoIds).')'
+        ];
+
         $leftJoin['IntroSeo'] = [
             'class' => 'mseIntro',
             'alias' => 'IntroSeo',
