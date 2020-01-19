@@ -41,7 +41,7 @@ $pdoFetch = $modx->getService('pdoFetch');
 $pdoFetch->setConfig($scriptProperties);
 $pdoFetch->addTime('pdoTools loaded.');
 
-/** @var mSearch2 $mSearch2 */
+/** @var mSearch2Seo $mSearch2 */
 $mSearch2 = $modx->getService('msearch2seo', 'mSearch2Seo',
     MODX_CORE_PATH.'components/msearch2/model/msearch2/', $scriptProperties
 );
@@ -189,6 +189,7 @@ switch ($action) {
         break;
 
     case 'search':
+
         $snippet = !empty($scriptProperties['element'])
             ? $scriptProperties['element']
             : 'mSearch2';
@@ -238,14 +239,19 @@ switch ($action) {
                 default:
                     $found = $mSearch2->Search($query);
                     if (!empty($found)) {
+                        $resources = '';
                         $foundResources = [];
                         foreach ($found as $foundKey => $foundWeight) {
                             $foundId = explode('::', $foundKey)[0];
                             $foundResources[$foundId] = $foundWeight;
                         }
-                        $resources = strtolower($snippet) === 'msearch2'
-                            ? json_encode($foundResources)
-                            : implode(',', array_keys($found));
+                        if (strtolower($snippet) === 'msearch2') {
+                            $resources = json_encode($foundResources);
+                        } elseif (strtolower($snippet) === 'msearch2seo') {
+                            $resources = json_encode($found);
+                        } else {
+                            $resources = implode(',', array_keys($foundResources));
+                        }
 
                         if (!isset($scriptProperties['parents'])) {
                             $scriptProperties['parents'] = 0;
@@ -258,27 +264,50 @@ switch ($action) {
                         }
 
                         $scriptProperties['returnIds'] = 0;
+                        $scriptProperties['returnData'] = 1;
                         $scriptProperties['resources'] = $resources;
                         $scriptProperties['outputSeparator'] = '<!-- msearch2 -->';
 
                         $html = $pdoFetch->runSnippet($snippet, $scriptProperties);
-                        if ($modx->user->hasSessionContext('mgr') && !empty($scriptProperties['showLog'])) {
-                            preg_match('#<pre class=".*?Log">(.*?)</pre>#s', $html, $matches);
-                            $log = $matches[1];
-                            $html = str_replace($matches[0], '', $html);
-                        }
-                        $processed = explode('<!-- msearch2 -->', $html);
-                        $scriptProperties['select'] = 'id,pagetitle';
-                        $scriptProperties['returnIds'] = 1;
-                        if ($ids = $pdoFetch->runSnippet($snippet, $scriptProperties)) {
-                            $rows = $pdoFetch->getCollection('modResource', null, ['resources' => $ids]);
-                            foreach ($rows as $k => $row) {
+
+                        if (is_array($html)) {
+                            //значит пришли результаты
+                            foreach ($html as $k => $row) {
+                                $url = $modx->makeUrl($row['id'], '', '', 'full');
+                                $pageTitle = $row['pagetitle'];
+
+                                if (!empty($row['seo_id'])) {
+                                    $seoUrl = $row['seo_new_url'] ?: $row['seo_old_url'];
+                                    $url = $mSearch2->makeUrl($seoUrl, $url, $row['id']);
+                                    $pageTitle = $row['seo_link'] ?: $pageTitle;
+                                }
+
                                 $results[] = [
                                     'id'    => $row['id'],
-                                    'url'   => $modx->makeUrl($row['id'], '', '', 'full'),
-                                    'value' => html_entity_decode($row['pagetitle'], ENT_QUOTES, 'UTF-8'),
-                                    'label' => $processed[$k] ?? $pdoFetch->getChunk($scriptProperties['tpl'], $row),
+                                    'url'   => $url,
+                                    'value' => html_entity_decode($pageTitle, ENT_QUOTES, 'UTF-8'),
+                                    'label' => $pdoFetch->getChunk($scriptProperties['tpl'], $row),
                                 ];
+                            }
+                        } else {
+                            if ($modx->user->hasSessionContext('mgr') && !empty($scriptProperties['showLog'])) {
+                                preg_match('#<pre class=".*?Log">(.*?)</pre>#s', $html, $matches);
+                                $log = $matches[1];
+                                $html = str_replace($matches[0], '', $html);
+                            }
+                            $processed = explode('<!-- msearch2 -->', $html);
+                            $scriptProperties['select'] = 'id,pagetitle';
+                            $scriptProperties['returnIds'] = 1;
+                            if ($ids = $pdoFetch->runSnippet($snippet, $scriptProperties)) {
+                                $rows = $pdoFetch->getCollection('modResource', null, ['resources' => $ids]);
+                                foreach ($rows as $k => $row) {
+                                    $results[] = [
+                                        'id'    => $row['id'],
+                                        'url'   => $modx->makeUrl($row['id'], '', '', 'full'),
+                                        'value' => html_entity_decode($row['pagetitle'], ENT_QUOTES, 'UTF-8'),
+                                        'label' => $processed[$k] ?? $pdoFetch->getChunk($scriptProperties['tpl'], $row)
+                                    ];
+                                }
                             }
                         }
                     }

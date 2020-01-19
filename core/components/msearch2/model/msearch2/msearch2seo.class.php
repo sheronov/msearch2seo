@@ -11,6 +11,7 @@ class mSearch2Seo extends mSearch2
 {
 
     const URL_CLASS = 'sfUrls';
+    protected $seoConfig = [];
 
     public function __construct(modX &$modx, array $config = [])
     {
@@ -99,7 +100,7 @@ class mSearch2Seo extends mSearch2
                 $this->modx->queryTime += microtime(true) - $tstart;
                 $this->modx->executedQueries++;
                 while ($row = $q->stmt->fetch(PDO::FETCH_ASSOC)) {
-                    if($row['class_key'] === self::URL_CLASS) {
+                    if ($row['class_key'] === self::URL_CLASS) {
                         $wordIndex = $row['resource'].'::'.$row['class_key'];
                     } else {
                         $wordIndex = $row['resource'];
@@ -224,8 +225,8 @@ class mSearch2Seo extends mSearch2
         $object->set('found', count($result));
         $object->save();
 
-        $this->modx->log(MODX_LOG_LEVEL_ERROR, "SeoSearch: \n".$this->pdoTools->getTime(true));
-        $this->modx->log(MODX_LOG_LEVEL_ERROR, "SeoSearch results: \n".print_r($result, 1));
+        // $this->modx->log(MODX_LOG_LEVEL_ERROR, "SeoSearch: \n".$this->pdoTools->getTime(true));
+        // $this->modx->log(MODX_LOG_LEVEL_ERROR, "SeoSearch results: \n".print_r($result, 1));
 
         return $result;
     }
@@ -258,16 +259,57 @@ class mSearch2Seo extends mSearch2
             $this->modx->queryTime += microtime(true) - $tstart;
             $this->modx->executedQueries++;
             while ($row = $q->stmt->fetch(PDO::FETCH_ASSOC)) {
-                if($row['class_key'] === self::URL_CLASS) {
+                if ($row['class_key'] === self::URL_CLASS) {
                     $result[] = $row['resource'].'::'.$row['class_key'];
-                }  else {
+                } else {
                     $result[] = $row['resource'];
                 }
-
             }
         }
 
         return $result;
+    }
+
+    public function makeUrl(string $seoUrl, string $pageUrl, string $pageId)
+    {
+        $config = $this->loadSeoConfig();
+
+        foreach ($config['possibleSuffixes'] as $possibleSuffix) {
+            if (substr($pageUrl, -strlen($possibleSuffix)) === $possibleSuffix) {
+                $pageUrl = substr($pageUrl, 0, -strlen($possibleSuffix));
+            }
+        }
+
+        if ($config['siteStart'] === $pageId) {
+            if ($config['mainAlias']) {
+                $q = $this->modx->newQuery('modResource', ['id' => $pageId]);
+                $q->select('alias');
+                $mainAlias = $this->modx->getValue($q->prepare());
+                $url = $pageUrl.'/'.$mainAlias.$config['betweenUrls'].$seoUrl.$config['urlSuffix'];
+            } else {
+                $url = $pageUrl.'/'.$seoUrl.$config['urlSuffix'];
+            }
+        } else {
+            $url = $pageUrl.$config['betweenUrls'].$seoUrl.$config['urlSuffix'];
+        }
+
+        return $url;
+    }
+
+    protected function loadSeoConfig()
+    {
+        if (empty($this->seoConfig)) {
+            $this->seoConfig = [
+                'urlSuffix'        => $this->modx->getOption('seofilter_url_suffix', null, '', true),
+                'betweenUrls'      => $this->modx->getOption('seofilter_between_urls', null, '/', true),
+                'mainAlias'        => $this->modx->getOption('seofilter_main_alias', null, 0),
+                'siteStart'        => $this->modx->context->getOption('site_start', 1),
+                'possibleSuffixes' => array_map('trim',
+                    explode(',', $this->modx->getOption('seofitler_possible_suffixes', null, '/,.html,.php',
+                        true)))
+            ];
+        }
+        return $this->seoConfig;
     }
 
 }
