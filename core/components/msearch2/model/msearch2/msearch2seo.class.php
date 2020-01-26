@@ -32,7 +32,7 @@ class mSearch2Seo extends mSearch2
         $config = array_merge($this->config, $config);
         $seoFields = [];
         $seoFieldsSettings = $this->modx->getOption('mse2_seo_index_fields', null,
-            'link_word:5,link_name:3,rule_title:1', true);
+            'seo_word:5,seo_name:3,rule_title:1', true);
 
         $tmp = array_map('trim', explode(',', strtolower($seoFieldsSettings)));
         foreach ($tmp as $v) {

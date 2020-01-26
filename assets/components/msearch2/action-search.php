@@ -279,7 +279,7 @@ switch ($action) {
                                 if (!empty($row['seo_id'])) {
                                     $seoUrl = $row['seo_new_url'] ?: $row['seo_old_url'];
                                     $url = $mSearch2->makeUrl($seoUrl, $url, $row['id']);
-                                    $pageTitle = $row['seo_link'] ?: $pageTitle;
+                                    $pageTitle = $row['seo_link'] ?? $pageTitle;
                                 }
 
                                 $results[] = [

@@ -8,6 +8,7 @@ if (!$modx->loadClass('msearch2seo', MODX_CORE_PATH.'components/msearch2/model/m
 }
 $modx->addPackage('seofilter', $modx->getOption('seofilter_core_path', [],
         $modx->getOption('core_path').'components/seofilter/').'model/');
+$seoHideEmpty = (bool)$modx->getOption('seofilter_hide_empty', [], 0);
 $mSearch2 = new mSearch2Seo($modx, $scriptProperties);
 $mSearch2->pdoTools->setConfig($scriptProperties);
 $mSearch2->pdoTools->addTime('pdoTools loaded.');
@@ -125,11 +126,16 @@ if (!empty($seoIds)) {
     }
 
     if (empty($returnIds)) {
+        $sfUrlsJoinCondition = $class.'.id = sfUrls.page_id AND modResource.id IN ('.implode(',',
+                $seoPages).') AND sfUrls.id IN ('.implode(',', $seoIds).') AND sfUrls.active = 1';
+        if ($seoHideEmpty) {
+            $sfUrlsJoinCondition .= ' AND sfUrls.total > 0';
+        }
+
         $leftJoin['sfUrls'] = [
             'class' => 'sfUrls',
             'alias' => 'sfUrls',
-            'on'    => $class.'.id = sfUrls.page_id AND modResource.id IN ('.implode(',',
-                    $seoPages).') AND sfUrls.id IN ('.implode(',', $seoIds).')'
+            'on'    => $sfUrlsJoinCondition
         ];
 
         $leftJoin['IntroSeo'] = [
@@ -239,6 +245,8 @@ if (!empty($rows) && is_array($rows)) {
             $row['weight'] = $found[$row['seo_id'].'::'.'sfUrls'] ?? '';
             $seoUrl = $row['seo_new_url'] ?: $row['seo_old_url'];
             $row['uri'] = $mSearch2->makeUrl($seoUrl, $row['uri'], $row['id']);
+            $row['page_title'] = $row['pagetitle'] ?? '';
+            $row['pagetitle'] = $row['seo_link'] ?? $row['pagetitle'];
         } else {
             $row['weight'] = $found[$row['id']] ?? '';
         }
