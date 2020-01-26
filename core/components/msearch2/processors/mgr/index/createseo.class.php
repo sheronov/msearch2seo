@@ -15,7 +15,7 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
 
     protected $indexSeoEmpty      = false;
     protected $processedRealPages = [];
-    protected $seoPagesToIndex  = [];
+    protected $seoPagesToIndex    = [];
     protected $resourceFields     = [];
     protected $seoFields          = [];
     protected $ruleFields         = [];
@@ -111,8 +111,39 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
 
     protected function createIndexForSeoPages()
     {
-        //TODO: здесь всё нужно синдексировать
+        $seoIds = array_keys($this->seoPagesToIndex);
+        $q = $this->modx->newQuery('sfUrlWord')
+            ->select('JSON_ARRAYAGG(url_id) as urls_id')
+            ->where(['url_id:IN' => $seoIds])
+            ->leftJoin('sfDictionary', 'sfDictionary', 'sfUrlWord.word_id = sfDictionary.id')
+            ->leftJoin('sfField', 'sfField', 'sfDictionary.field_id = sfField.id')
+            ->select($this->modx->getSelectColumns('sfDictionary', 'sfDictionary', ''))
+            ->select('sfField.alias as field_alias')
+            ->groupby('sfDictionary.id')
+            ->sortby('sfDictionary.id');
+
+
+        if ($q->prepare() && $q->stmt->execute()) {
+            while ($row = $q->stmt->fetch(PDO::FETCH_ASSOC)) {
+                $urlsId = $row['urls_id'];
+                if (!is_array($urlsId)) {
+                    $urlsId = $this->modx->fromJSON($urlsId);
+                }
+                foreach ($urlsId as $urlId) {
+                    if (isset($this->seoPagesToIndex[$urlId]['_words'])) {
+                        $this->seoPagesToIndex[$urlId]['_words'][$row['field_alias']] = $row;
+                    } else {
+                        $this->seoPagesToIndex[$urlId]['_words'] = [$row['field_alias'] => $row];
+                    }
+                }
+            }
+        }
+
+        foreach ($this->seoPagesToIndex as $seoPageData) {
+            $this->indexSeoPage($seoPageData);
+        }
     }
+
 
     /**
      * Prepares query and returns resource for indexing
@@ -149,6 +180,70 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
         }
 
         return $collection;
+    }
+
+    protected function indexSeoPage(array $data)
+    {
+        $words = $intro = [];
+        // For proper transliterate umlauts
+        setlocale(LC_ALL, 'en_US.UTF8', LC_CTYPE);
+
+        foreach ($this->mSearch2->fields as $field => $weight) {
+            if (mb_strpos($field, 'seo_') === false && mb_strpos($field, 'rule_') === false) {
+                continue;
+            }
+            if ($field === 'seo_word') {
+                $text = implode(' ', array_column($data['_words'], 'value'));
+            } elseif ($text = $data[$field] ?? '') {
+                $text = $this->mSearch2->pdoTools->getChunk('@INLINE '.$text, $this->prepareWordsForSeo($data));
+            }
+            $text = $this->modx->stripTags($text);
+            if (!empty($text)) {
+                $forms = $this->_getBaseForms($text);
+                $intro[] = $text;
+                foreach ($forms as $form => $count) {
+                    $words[$form][$field] = $count;
+                }
+            }
+        }
+
+
+        $q = $this->toBdQuery($data['seo_id'], 'sfUrls', $intro, $words);
+        if (!$q->execute()) {
+            $this->modx->log(modX::LOG_LEVEL_ERROR,
+                '[mSearch2] Could not save search index of SEO page '.$data['seo_id'].': '
+                .print_r($q->errorInfo(), 1));
+        }
+    }
+
+    protected function prepareWordsForSeo(array $data): array
+    {
+        $words = [
+            'id'          => (int)$data['id'],
+            'total'       => (int)$data['seo_total'],
+            'count'       => (int)$data['seo_total'],
+            'rule_id'     => (int)$data['rule_id'],
+            'url'         => (int)$data['seo_id'],
+            'link'        => $data['seo_link'],
+            'page_number' => 1,
+        ];
+
+        foreach ($data['_words'] as $field => $word) {
+            foreach ($word as $key => $val) {
+                if (!isset($words[$key])) {
+                    $words[$key] = $val;
+                }
+                if (mb_strpos($key, 'value') !== false) {
+                    $words[str_replace('value', $field, $key)] = $val;
+                }
+            }
+            $words[$field.'_input'] = $word['input'];
+            $words[$field.'_alias'] = $word['alias'];
+            $words[$field.'_word'] = $word['id'];
+            $words['m_'.$field] = $word['m_value_i'];
+        }
+
+        return $words;
     }
 
     /**
@@ -192,30 +287,10 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
             }
         }
 
-        $tword = $this->modx->getTableName('mseWord');
-        $tintro = $this->modx->getTableName('mseIntro');
-        $resource_id = $resource->get('id');
-
-        $intro = str_replace(["\n", "\r\n", "\r"], ' ', implode(' ', $intro));
-        $intro = preg_replace('#\s+#u', ' ', str_replace(['\'', '"', '«', '»', '`'], '', $intro));
-        $sql = "INSERT INTO {$tintro} (`resource`, `intro`) VALUES ('$resource_id', '$intro') ON DUPLICATE KEY UPDATE `intro` = '$intro';";
-        $sql .= "DELETE FROM {$tword} WHERE `resource` = '$resource_id' AND `class_key` != 'sfUrls';";
-
-        if (!$class_key = $resource->get('class_key')) {
-            $class_key = get_class($resource);
+        if (!$classKey = $resource->get('class_key')) {
+            $classKey = get_class($resource);
         }
-        if (!empty($words)) {
-            $rows = [];
-            foreach ($words as $word => $fields) {
-                foreach ($fields as $field => $count) {
-                    $rows[] = "({$resource_id}, '{$field}', '{$word}', '{$count}', '{$class_key}')";
-                }
-            }
-            $sql .= "INSERT INTO {$tword} (`resource`, `field`, `word`, `count`, `class_key`) VALUES ".implode(',',
-                    $rows);
-        }
-
-        $q = $this->modx->prepare($sql);
+        $q = $this->toBdQuery($resource->get('id'), $classKey, $intro, $words);
         if ($q->execute()) {
             $this->modx->invokeEvent('mse2OnSearchIndex', [
                 'object'   => $resource,
@@ -225,8 +300,39 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
             ]);
         } else {
             $this->modx->log(modX::LOG_LEVEL_ERROR,
-                '[mSearch2] Could not save search index of resource '.$resource_id.': '.print_r($q->errorInfo(), 1));
+                '[mSearch2] Could not save search index of resource '.$resource->get('id').': '
+                .print_r($q->errorInfo(), 1));
         }
+    }
+
+    protected function toBdQuery(int $resourceId, string $classKey, array $intro, array $words, bool $seo = false)
+    {
+        $mseWordTable = $this->modx->getTableName('mseWord');
+        $mseIntroTable = $this->modx->getTableName('mseIntro');
+
+        $intro = str_replace(["\n", "\r\n", "\r"], ' ', implode(' ', $intro));
+        $intro = preg_replace('#\s+#u', ' ', str_replace(['\'', '"', '«', '»', '`'], '', $intro));
+        $sql = "INSERT INTO {$mseIntroTable} (`resource`, `intro`, `class_key`)"
+            ." VALUES ('{$resourceId}', '{$intro}', '{$classKey}')"
+            ." ON DUPLICATE KEY UPDATE `intro` = '{$intro}';";
+        if ($seo) {
+            $sql .= "DELETE FROM {$mseWordTable} WHERE `resource` = '{$resourceId}' AND `class_key` != 'sfUrls';";
+        } else {
+            $sql .= "DELETE FROM {$mseWordTable} WHERE `resource` = '{$resourceId}' AND `class_key` = 'sfUrls';";
+        }
+
+        if (!empty($words)) {
+            $rows = [];
+            foreach ($words as $word => $fields) {
+                foreach ($fields as $field => $count) {
+                    $rows[] = "({$resourceId}, '{$field}', '{$word}', '{$count}', '{$classKey}')";
+                }
+            }
+            $sql .= "INSERT INTO {$mseWordTable} (`resource`, `field`, `word`, `count`, `class_key`) VALUES ".implode(',',
+                    $rows);
+        }
+
+        return $this->modx->prepare($sql);
     }
 
 
@@ -261,17 +367,14 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
         $this->indexSeoEmpty = (bool)$this->modx->getOption('mse2_seo_index_empty', [], 0);
         $this->modx->addPackage('seofilter', $this->modx->getOption('seofilter_core_path', [],
                 $this->modx->getOption('core_path').'components/seofilter/').'model/');
-        /** @noinspection PhpUndefinedFieldInspection */
-        if (!empty($this->modx->mSearch2) && $this->modx->mSearch2 instanceof mSearch2Seo) {
-            /** @noinspection PhpUndefinedFieldInspection */
-            $this->mSearch2 = &$this->modx->mSearch2;
-        } else {
-            if (!class_exists('mSearch2Seo')) {
-                /** @noinspection PhpIncludeInspection */
-                require_once MODX_CORE_PATH.'components/msearch2/model/msearch2/msearch2seo.class.php';
-            }
+
+        if (!class_exists('mSearch2Seo')) {
+            require_once MODX_CORE_PATH.'components/msearch2/model/msearch2/msearch2seo.class.php';
+        }
+        if (!$this->mSearch2) {
             $this->mSearch2 = new mSearch2Seo($this->modx, []);
         }
+
         $this->modx->sanitizePatterns['fenom'] = '#\{.*\}#si';
 
         $this->prepareClassesFields();
@@ -286,7 +389,20 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
         $ruleFields = [];
         foreach (array_keys($this->mSearch2->fields) as $field) {
             if (mb_strpos($field, 'seo_') === 0) {
-                $seoFields[] = str_replace('seo_', '', $field);
+                $seoField = str_replace('seo_', '', $field);
+                $seoFields[] = $seoField;
+                if (in_array($seoField, [
+                    'title',
+                    'h1',
+                    'h2',
+                    'description',
+                    'introtext',
+                    'keywords',
+                    'text',
+                    'content'
+                ], true)) {
+                    $ruleFields[] = $seoField;
+                }
             } elseif (mb_strpos($field, 'rule_') === 0) {
                 $ruleFields[] = str_replace('rule_', '', $field);
             } else {
@@ -299,11 +415,11 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
         ));
         $this->seoFields = array_unique(array_merge(
             array_intersect(array_keys($this->modx->getFieldMeta('sfUrls')), $seoFields),
-            ['id', 'active', 'total']
+            ['id', 'active', 'total', 'custom']
         ));
         $this->ruleFields = array_unique(array_merge(
             array_intersect(array_keys($this->modx->getFieldMeta('sfRule')), $ruleFields),
-            ['id', 'active']
+            ['id', 'active', 'link_tpl']
         ));
     }
 
