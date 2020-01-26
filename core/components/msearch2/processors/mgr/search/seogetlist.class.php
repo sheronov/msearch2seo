@@ -28,8 +28,8 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
     public function getData()
     {
         $data = [];
-        $limit = intval($this->getProperty('limit'));
-        $start = intval($this->getProperty('start'));
+        $limit = (int)$this->getProperty('limit');
+        $start = (int)$this->getProperty('start');
 
         if ($query = $this->mSearch2->getQuery($this->getProperty('query'))) {
             $minQuery = $this->modx->getOption('index_min_words_length', null, 3, true);
