@@ -22,7 +22,7 @@ mSearch2.grid.Search = function (config) {
         paging: true,
         remoteSort: true,
         columns: [this.exp,
-            {header: _('id'), dataIndex: 'id', width: 70, renderer: this.renderId},
+            {header: _('id'), dataIndex: 'id', width: 70},
             {header: _('pagetitle'), dataIndex: 'pagetitle', width: 150, renderer: this.renderPagetitle},
             {header: _('mse2_weight'), dataIndex: 'weight', width: 50},
             {header: _('published'), dataIndex: 'published', width: 50, renderer: this.renderPublished},

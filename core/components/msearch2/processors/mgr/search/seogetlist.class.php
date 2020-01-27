@@ -153,6 +153,7 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
             $array['weight'] = $this->ids[$array['seo_id'].'::'.'sfUrls'] ?? '';
             $seoUrl = $array['seo_new_url'] ?: $array['seo_old_url'];
             $array['uri'] = $this->mSearch2->makeUrl($seoUrl, $array['uri'], $array['id']);
+            $array['id'] .= '::'.$array['seo_id'];
         } else {
             $array['weight'] = $this->ids[$array['id']] ?? '';
         }

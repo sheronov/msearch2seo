@@ -150,9 +150,13 @@ if (!empty($resources)) {
     if (!is_array($resources)) {
         $resources = array_map('trim', explode(',', $resources));
     }
-    $resources = array_unique(array_merge($resources, $seoPages));
-    unset($scriptProperties['resources']);
 }
+if (!empty($seoPages)) {
+    $resources = array_unique(array_merge($resources, $seoPages));
+}
+
+unset($scriptProperties['resources']);
+
 
 /*----------------------------------------------------------------------------------*/
 if (empty($returnIds)) {
