@@ -189,7 +189,6 @@ switch ($action) {
         break;
 
     case 'search':
-
         $snippet = !empty($scriptProperties['element'])
             ? $scriptProperties['element']
             : 'mSearch2';
@@ -269,25 +268,35 @@ switch ($action) {
                         $scriptProperties['outputSeparator'] = '<!-- msearch2 -->';
 
                         $html = $pdoFetch->runSnippet($snippet, $scriptProperties);
+                        if (strtolower($snippet) === 'msearch2seo') {
+                            if(is_array($html)) {
+                                foreach ($html as $k => $row) {
+                                    if($k === 'log') {
+                                        if ($modx->user->hasSessionContext('mgr') && !empty($scriptProperties['showLog'])) {
+                                            if(preg_match('#<pre class=".*?Log">(.*?)</pre>#s', $row, $matches)) {
+                                                $log = $matches[1];
+                                            } else {
+                                                $log = $row;
+                                            }
+                                        }
+                                        continue;
+                                    }
+                                    $url = $modx->makeUrl($row['id'], '', '', 'full');
+                                    $pageTitle = $row['pagetitle'];
 
-                        if (is_array($html)) {
-                            //значит пришли результаты
-                            foreach ($html as $k => $row) {
-                                $url = $modx->makeUrl($row['id'], '', '', 'full');
-                                $pageTitle = $row['pagetitle'];
+                                    if (!empty($row['seo_id'])) {
+                                        $seoUrl = $row['seo_new_url'] ?: $row['seo_old_url'];
+                                        $url = $mSearch2->makeUrl($seoUrl, $url, $row['id']);
+                                        $pageTitle = $row['seo_link'] ?: $pageTitle;
+                                    }
 
-                                if (!empty($row['seo_id'])) {
-                                    $seoUrl = $row['seo_new_url'] ?: $row['seo_old_url'];
-                                    $url = $mSearch2->makeUrl($seoUrl, $url, $row['id']);
-                                    $pageTitle = $row['seo_link'] ?? $pageTitle;
+                                    $results[] = [
+                                        'id'    => $row['id'],
+                                        'url'   => $url,
+                                        'value' => html_entity_decode($pageTitle, ENT_QUOTES, 'UTF-8'),
+                                        'label' => $pdoFetch->getChunk($scriptProperties['tpl'], $row),
+                                    ];
                                 }
-
-                                $results[] = [
-                                    'id'    => $row['id'],
-                                    'url'   => $url,
-                                    'value' => html_entity_decode($pageTitle, ENT_QUOTES, 'UTF-8'),
-                                    'label' => $pdoFetch->getChunk($scriptProperties['tpl'], $row),
-                                ];
                             }
                         } else {
                             if ($modx->user->hasSessionContext('mgr') && !empty($scriptProperties['showLog'])) {

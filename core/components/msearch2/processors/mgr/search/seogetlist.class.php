@@ -6,11 +6,12 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
     public $classKey   = 'modResource';
     /** @var mSearch2 $mSearch2 */
     public    $mSearch2;
-    protected $ids       = [];
-    protected $resources = [];
-    protected $seoIds    = [];
-    protected $seoPages  = [];
-    protected $toSortIds = [];
+    protected $ids          = [];
+    protected $resources    = [];
+    protected $seoIds       = [];
+    protected $seoPages     = [];
+    protected $toSortIds    = [];
+    protected $seoHideEmpty = [];
 
 
     /**
@@ -123,8 +124,14 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
     {
         $c->where(['id:IN' => $this->resources]);
         if (!empty($this->seoIds)) {
-            $c->leftJoin('sfUrls', 'sfUrls', $this->classKey.'.id = sfUrls.page_id AND modResource.id IN ('.implode(',',
-                    $this->seoPages).') AND sfUrls.id IN ('.implode(',', $this->seoIds).')');
+            $sfUrlsJoinCondition = $this->classKey.'.id = sfUrls.page_id AND modResource.id IN ('.implode(',',
+                    $this->seoPages).') AND sfUrls.id IN ('.implode(',', $this->seoIds).')';
+
+            if ($this->seoHideEmpty && !$this->getProperty('seo_empty')) {
+                $sfUrlsJoinCondition .= ' AND sfUrls.total > 0';
+            }
+
+            $c->leftJoin('sfUrls', 'sfUrls', $sfUrlsJoinCondition);
             $c->leftJoin('mseIntro', 'IntroSeo', "sfUrls.id = IntroSeo.resource  AND IntroSeo.class_key = 'sfUrls'");
         }
 
@@ -152,7 +159,8 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
         if (isset($array['seo_id'])) {
             $array['weight'] = $this->ids[$array['seo_id'].'::'.'sfUrls'] ?? '';
             $seoUrl = $array['seo_new_url'] ?: $array['seo_old_url'];
-            $array['uri'] = $this->mSearch2->makeUrl($seoUrl, $array['uri'], $array['id']);
+            $pageUrl = $this->modx->makeUrl($array['id'], '', '', 'full');
+            $array['uri'] = $this->mSearch2->makeUrl($seoUrl, $pageUrl, $array['id']);
             $array['id'] .= '::'.$array['seo_id'];
         } else {
             $array['weight'] = $this->ids[$array['id']] ?? '';
@@ -179,6 +187,8 @@ class mseIndexSeoGetListProcessor extends modObjectGetListProcessor
 
         $this->modx->addPackage('seofilter', $this->modx->getOption('seofilter_core_path', [],
                 $this->modx->getOption('core_path').'components/seofilter/').'model/');
+
+        $this->seoHideEmpty = (bool)$this->modx->getOption('seofilter_hide_empty', [], 0);
 
         return $this->mSearch2 instanceof mSearch2Seo;
     }

@@ -101,6 +101,22 @@ mSearch2.grid.Search = function (config) {
                             }
                         }
                     }
+                },
+                '-',
+                {
+                    xtype: 'xcheckbox',
+                    value: 1,
+                    boxLabel: _('mse2_show_seo_empty') || 'Пустые SEO страницы',
+                    checked: false,
+                    name: 'seo_empty',
+                    id: 'msearch2-check-seo_empty',
+                    listeners: {
+                        check: {
+                            fn: function () {
+                                Ext.getCmp('mse2_search_btn').fireEvent('click');
+                            }
+                        }
+                    }
                 }
             ]
         }
@@ -117,6 +133,7 @@ Ext.extend(mSearch2.grid.Search, MODx.grid.Grid, {
             s.baseParams.query = query;
             s.baseParams.unpublished = Ext.getCmp('msearch2-check-unpublished').getValue() == true ? 1 : 0;
             s.baseParams.deleted = Ext.getCmp('msearch2-check-deleted').getValue() == true ? 1 : 0;
+            s.baseParams.seo_empty = Ext.getCmp('msearch2-check-seo_empty').getValue() == true ? 1 : 0;
             this.getBottomToolbar().changePage(1);
         }
     },
@@ -145,13 +162,19 @@ Ext.extend(mSearch2.grid.Search, MODx.grid.Grid, {
         var label = val;
         var action = MODx.action ? MODx.action['resource/update'] : 'resource/update';
         var url = 'index.php?a=' + action + '&id=' + row.data['id'];
+        var addLink = '';
 
         if (row.json.hasOwnProperty('seo_id') && row.json['seo_id']) {
             label = 'SeoFilter: ' + row.json['seo_link'] || label;
             url = '?a=seoedit&namespace=seofilter&id=' + row.json['seo_id'];
+            addLink = ' <span title="Результатов">(' + row.json['seo_total'] + ')</span> '
+            addLink += '<a href="' + row.json['uri'] + '" target="_blank" title="К странице на сайте" style="color:#0088cc">' +
+                '<i class="icon icon-external-link"></i></a>';
         }
 
-        return '<a href="' + url + '" target="_blank" style="color:#0088cc">' + label + '</a>'
+        var managerLink = '<a href="' + url + '" target="_blank" style="color:#0088cc">' + label + '</a>';
+
+        return managerLink + addLink;
     },
 
     renderPublished: function (val, cell, row) {

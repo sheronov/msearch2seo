@@ -127,7 +127,7 @@ if (!empty($seoIds)) {
 
     if (empty($returnIds)) {
         $sfUrlsJoinCondition = $class.'.id = sfUrls.page_id AND modResource.id IN ('.implode(',',
-                $seoPages).') AND sfUrls.id IN ('.implode(',', $seoIds).') AND sfUrls.active = 1';
+                array_unique($seoPages)).') AND sfUrls.id IN ('.implode(',', $seoIds).') AND sfUrls.active = 1';
         if ($seoHideEmpty) {
             $sfUrlsJoinCondition .= ' AND sfUrls.total > 0';
         }
@@ -216,7 +216,7 @@ if (!empty($resources)) {
         : $resources;
 }
 
-if (!empty($toSortIds)) {
+if (!empty($toSortIds) && !empty($seoIds)) {
     $scriptProperties['sortby'] = 'FIELD(IFNULL(sfUrls.id, modResource.id), '.implode(',', $toSortIds).')';
 }
 
@@ -273,6 +273,7 @@ if (!empty($rows) && is_array($rows)) {
     }
     $mSearch2->pdoTools->addTime('Returning processed chunks');
     if ($returnData) {
+        $output['log'] = $log;
         return $output;
     }
     if (!empty($toSeparatePlaceholders)) {
