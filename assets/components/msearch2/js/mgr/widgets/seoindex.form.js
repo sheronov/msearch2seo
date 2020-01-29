@@ -83,7 +83,7 @@ Ext.extend(mSearch2.panel.Index, MODx.FormPanel, {
             , words: {value: 0, disabled: true}
             , words_seo: {value: 0, disabled: true, seo: true, label:'Проиндесировано SEO слов'}
             , delimeter: {xtype: 'displayfield', value: '&nbsp;'}
-            , limit: {value: 10, minValue: 1, maxValue: 1000}
+            , limit: {value: 100, minValue: 1, maxValue: 1000}
             , offset: {value: 0}
         };
 

@@ -19,6 +19,8 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
     protected $resourceFields     = [];
     protected $seoFields          = [];
     protected $ruleFields         = [];
+    protected $seoFilterPro       = false;
+    protected $loadedPages        = [];
 
     /**
      * {@inheritDoc}
@@ -111,6 +113,9 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
 
     protected function createIndexForSeoPages()
     {
+        if ($this->seoFilterPro) {
+            $this->loadLinkedPages();
+        }
         $seoIds = array_keys($this->seoPagesToIndex);
         $q = $this->modx->newQuery('sfUrlWord')
             ->select('JSON_ARRAYAGG(url_id) as urls_id')
@@ -141,6 +146,20 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
 
         foreach ($this->seoPagesToIndex as $seoPageData) {
             $this->indexSeoPage($seoPageData);
+        }
+    }
+
+    protected function loadLinkedPages()
+    {
+        $linkedPageIds = array_diff(array_unique(array_column($this->seoPagesToIndex, 'id')),
+            array_keys($this->loadedPages));
+        if (!empty($linkedPageIds)) {
+            $pages = $this->modx->getCollection('modResource', ['id:IN' => $linkedPageIds]);
+            foreach ($pages as $page) {
+                if (!isset($this->loadedPages[$page->get('id')])) {
+                    $this->loadedPages[$page->get('id')] = $page->toArray();
+                }
+            }
         }
     }
 
@@ -219,7 +238,6 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
     protected function prepareWordsForSeo(array $data): array
     {
         $words = [
-            'id'          => (int)$data['id'],
             'total'       => (int)$data['seo_total'],
             'count'       => (int)$data['seo_total'],
             'rule_id'     => (int)$data['rule_id'],
@@ -242,6 +260,22 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
             $words[$field.'_word'] = $word['id'];
             $words['m_'.$field] = $word['m_value_i'];
         }
+
+        foreach (['id', 'page', 'page_id'] as $pkey) {
+            if (!isset($words[$pkey])) {
+                $words[$pkey] = (int)$data['id'];
+            }
+        }
+
+        if (isset($this->loadedPages[$data['id']])) {
+            if (!isset($words['resource'])) {
+                $words['resource'] = $this->loadedPages[$data['id']];
+            }
+            if (!isset($words['original_page'])) {
+                $words['original_page'] = $this->loadedPages[$data['id']];
+            }
+        }
+
 
         return $words;
     }
@@ -365,6 +399,7 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
     public function loadClass()
     {
         $this->indexSeoEmpty = (bool)$this->modx->getOption('mse2_seo_index_empty', [], 0);
+        $this->seoFilterPro = (bool)$this->modx->getOption('seofilter_pro_mode', null, 0, true);
         $this->modx->addPackage('seofilter', $this->modx->getOption('seofilter_core_path', [],
                 $this->modx->getOption('core_path').'components/seofilter/').'model/');
 
