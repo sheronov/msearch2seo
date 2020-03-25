@@ -16,7 +16,9 @@ class mSearch2Seo extends mSearch2
     public function __construct(modX &$modx, array $config = [])
     {
         parent::__construct($modx, $config);
-        $this->config['showSearchLog'] = true;
+        $this->config['showSearchLog'] = $this->modx->getOption('showSearchLog', $config, false);
+        $this->config['seo_like_match_bonus'] = $this->modx->getOption('mse2_seo_search_like_match_bonus', $config,
+            $this->config['like_match_bonus'], true);
     }
 
     /**
@@ -152,12 +154,19 @@ class mSearch2Seo extends mSearch2
                     }
                 }
                 if (!empty($not_found)) {
-                    $resourceId = explode('::', $k)[0];
+                    $pagesId = explode('::', $k);
+                    $resourceId = $pagesId[0];
                     if ($this->simpleSearch(implode(' ', $not_found), false, $resourceId)) {
                         foreach ($not_found as $word) {
-                            $index[$k]['words'][$word] = $this->config['like_match_bonus'];
-                            $index[$k]['weight'] += $this->config['like_match_bonus'];
-                            $message .= "\n\t+ {$this->config['like_match_bonus']} points to resource {$k} for word \"{$word}\" in LIKE search";
+                            $index[$k]['words'][$word] = isset($pagesId[1])
+                                ? $this->config['seo_like_match_bonus']
+                                : $this->config['like_match_bonus'];
+                            $index[$k]['weight'] += isset($pagesId[1])
+                                ? $this->config['seo_like_match_bonus']
+                                : $this->config['like_match_bonus'];
+                            $message .= isset($pagesId[1])
+                                ? "\n\t+ {$this->config['seo_like_match_bonus']} points to seo {$k} for word \"{$word}\" in LIKE search"
+                                : "\n\t+ {$this->config['like_match_bonus']} points to resource {$k} for word \"{$word}\" in LIKE search";
                         }
                     } else {
                         unset($index[$k]);
@@ -182,10 +191,13 @@ class mSearch2Seo extends mSearch2
             $like = $this->simpleSearch($query, false);
             $message = '';
             foreach ($like as $k) {
+                $pagesId = explode('::', $k);
                 if (!isset($result[$k])) {
-                    $result[$k] = $this->config['like_match_bonus'];
-                    $message .= "\n\t+ {$this->config['like_match_bonus']} points to resource {$k} for words \"".implode(',',
-                            $bulk_words)."\"";
+                    $result[$k] = isset($pagesId[1]) ? $this->config['seo_like_match_bonus'] : $this->config['like_match_bonus'];
+                    $message .= isset($pagesId[1])
+                        ? "\n\t+ {$this->config['seo_like_match_bonus']} points to seo resource "
+                        : "\n\t+ {$this->config['like_match_bonus']} points to resource ";
+                    $message .= $k.' for words "'.implode(',', $bulk_words).'"';
                     $added++;
                 }
             }
