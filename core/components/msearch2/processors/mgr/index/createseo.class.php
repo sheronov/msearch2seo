@@ -16,6 +16,7 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
     protected $indexSeoEmpty      = false;
     protected $processedRealPages = [];
     protected $seoPagesToIndex    = [];
+    protected $indexSeoRules      = [];
     protected $resourceFields     = [];
     protected $seoFields          = [];
     protected $ruleFields         = [];
@@ -173,13 +174,29 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
     {
         $this->_limit = $this->getProperty('limit', 100);
         $this->_offset = $this->getProperty('offset', 0);
-
         $c = $this->modx->newQuery('modResource');
-        if ($this->indexSeoEmpty) {
-            $c->leftJoin('sfUrls', 'sfUrls', 'modResource.id = sfUrls.page_id');
-        } else {
-            $c->leftJoin('sfUrls', 'sfUrls', 'modResource.id = sfUrls.page_id AND sfUrls.total > 0');
+
+        $conditions = [
+            'modResource.id = sfUrls.page_id'
+        ];
+        if (!$this->indexSeoEmpty) {
+            $conditions[] = 'sfUrls.total > 0';
         }
+        if (!empty($this->indexSeoRules)) {
+            $excludeSeoRules = array_map('abs', array_filter($this->indexSeoRules, function ($val) {
+                return (int)$val < 0;
+            }));
+            $includeSeoRules = array_map('abs', array_filter($this->indexSeoRules, function ($val) {
+                return (int)$val > 0;
+            }));
+            if (!empty($excludeSeoRules)) {
+                $conditions[]  = 'sfUrls.multi_id NOT IN ('.implode(',', $excludeSeoRules).')';
+            }
+            if (!empty($includeSeoRules)) {
+                $conditions[]  = 'sfUrls.multi_id IN ('.implode(',', $includeSeoRules).')';
+            }
+        }
+        $c->leftJoin('sfUrls', 'sfUrls', $conditions);
         $c->leftJoin('sfRule', 'sfRule', 'sfRule.id = sfUrls.multi_id');
         $c->select($this->modx->getSelectColumns('modResource', 'modResource', '', $this->resourceFields));
         $c->select($this->modx->getSelectColumns('sfUrls', 'sfUrls', 'seo_', $this->seoFields));
@@ -398,6 +415,9 @@ class mseIndexCreateSeoProcessor extends mseIndexCreateProcessor
      */
     public function loadClass()
     {
+        $this->indexSeoRules = array_map('trim',
+            explode(',', $this->modx->getOption('mse2_seo_index_rules', [], null, true))
+        );
         $this->indexSeoEmpty = (bool)$this->modx->getOption('mse2_seo_index_empty', [], 0);
         $this->seoFilterPro = (bool)$this->modx->getOption('seofilter_pro_mode', null, 0, true);
         $this->modx->addPackage('seofilter', $this->modx->getOption('seofilter_core_path', [],
