@@ -216,7 +216,7 @@ if (!empty($resources)) {
         : $resources;
 }
 
-if (!empty($toSortIds) && !empty($seoIds)) {
+if (empty($scriptProperties['sortby']) && !empty($toSortIds) && !empty($seoIds)) {
     $scriptProperties['sortby'] = 'FIELD(IFNULL(sfUrls.id, modResource.id), '.implode(',', $toSortIds).')';
 }
 
